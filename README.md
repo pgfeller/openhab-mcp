@@ -12,17 +12,20 @@ This server exposes the entire OpenHAB REST API as a set of tools for AI models 
 ## Configuration
 
 The server requires two environment variables:
+
 - `OPENHAB_URL`: The URL of your OpenHAB instance (e.g., `http://openhab:8080`)
 - `OPENHAB_API_TOKEN`: Your generated long-lived API token.
 
 ## Setup instructions
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 2. **Build the server:**
+
    ```bash
    npm run build
    ```
@@ -43,9 +46,7 @@ Add the following to your `claude_desktop_config.json`:
   "mcpServers": {
     "openhab": {
       "command": "node",
-      "args": [
-        "/path/to/oh-mcp/dist/index.js"
-      ],
+      "args": ["/path/to/oh-mcp/dist/index.js"],
       "env": {
         "OPENHAB_URL": "http://openhab:8080",
         "OPENHAB_API_TOKEN": "your_openhab_token_here"
@@ -64,9 +65,7 @@ Add the following to your Antigravity MCP settings:
   "mcpServers": {
     "openhab": {
       "command": "node",
-      "args": [
-        "/path/to/oh-mcp/dist/index.js"
-      ],
+      "args": ["/path/to/oh-mcp/dist/index.js"],
       "env": {
         "OPENHAB_URL": "http://openhab:8080",
         "OPENHAB_API_TOKEN": "your_openhab_token_here"
@@ -85,9 +84,7 @@ Add a new MCP server in your settings:
   "mcpServers": {
     "openhab": {
       "command": "node",
-      "args": [
-        "dist/index.js"
-      ],
+      "args": ["dist/index.js"],
       "env": {
         "OPENHAB_URL": "http://openhab:8080",
         "OPENHAB_API_TOKEN": "your_openhab_token_here"
@@ -101,63 +98,110 @@ Add a new MCP server in your settings:
 
 ## 🛠 Available Tools
 
-This server exposes over 60 tools. Here is a categorized breakdown of what they can do:
+This server exposes over 80 tools for comprehensive OpenHAB management.
+
+### 🚀 Smart & Advanced Tools
+
+Tools designed to automate complex workflows and provide AI-friendly context.
+
+- `get_system_summary`: High-density overview of the entire system (rooms, items, things, health).
+- `get_prompt_context`: Condensed priming context for an AI agent.
+- `get_schema`: Minimal mapping of all items (name, type, label).
+- `search_items`: Fuzzy search for items by name, label, or location.
+- `create_equipment_from_thing`: Automatically creates an Equipment group and Point items from a Thing's channels.
+- `explain_item_state`: Forensic review of an item (state + history + linked hardware + affecting rules).
+- `predictive_rule_generator`: Generates a validated Javascript rule from natural language intent.
+- `shadow_run`: Simulates a sequence of commands and predicts resulting states without hardware impact.
+- `generate_topology`: Generates a Mermaid graph of the home's spatial/logical hierarchy.
+- `analyze_system_health`: Scans for hardware issues, connectivity drift, and low batteries.
+- `audit_semantic_model`: Structural audit to find loose items or missing equipment hierarchy.
+- `bulk_item_remediation`: Mass-update tags, categories, and groups for a list of items.
+- `discover_automation_patterns`: Correlation engine to suggest automations based on persistence history.
+- `detect_rule_conflicts`: Identifies potential race conditions or conflicting logic between rules.
+- `standardize_naming_convention`: Proposes a unified Location_Equipment_Point naming format.
+- `optimize_persistence_strategy`: Recommends optimal recording intervals to prevent database bloat.
+- `sitemap_to_main_ui`: Converts legacy .sitemap definitions to modern MainUI YAML.
+- `optimize_mcp_focus`: Locks the MCP to a specific Room or Group to save tokens and increase AI accuracy.
+- `export_system_snapshot`: Generates a portable JSON snapshot for rapid backup and restore.
+- `get_mcp_health`: Returns real-time health metrics (SSE status, cache hit rates, buffer size).
+- `summarize_persistence_range`: Returns statistical summary of historical data to save context tokens.
+- `get_mcp_capabilities`: Returns a list of currently active advanced capabilities.
+- `simulate_system_state`: Predicts command outcomes (including triggers) without affecting hardware.
+- `generate_home_blueprint`: Auto-generates a structured Markdown manual of your entire home model.
+- `audit_system_safety`: Proactive scanner for security items (Locks, Alarms) with safety check logic.
+- `calculate_energy_insights`: Aggregates energy/power data into a high-level consumption report.
+- `test_transformation`: Evaluate REGEX or JSONPATH patterns locally.
+- `get_recent_logs`: Real-time tail of the OpenHAB event stream (items, commands, things).
+- `get_visual_chart`: Generates ASCII sparkline charts for an item's recent history.
+- `validate_rule_logic`: Sanitizes scripts for syntax errors and safety (infinite loops/guards).
 
 ### 🔹 Items & State
-- `get_items`: List all items with optional filters (`tags`, `type`, `metadata`).
-- `get_item`: Fetch details and current state of a specific item.
-- `send_command`: Send commands (e.g., `ON`, `OFF`, `50`) to an item.
-- `update_state`: Manually update an item's state.
-- `create_or_update_item`: Define a new item or update an existing one.
-- `delete_item`: Remove an item from the system.
-- `add_tag` / `remove_tag`: Manage semantic or functional tags.
-- `set_metadata` / `remove_metadata`: Manage item metadata (e.g., namespace values).
 
-### 🔹 Things & Hardware
-- `get_things`: List all physical or logical things.
-- `get_thing`: Get hardware details and configuration for a thing.
-- `get_thing_status`: Check if a thing is `ONLINE`, `OFFLINE`, etc.
-- `update_thing_config`: Modify hardware configuration parameters.
-- `enable_thing`: Enable or disable a thing (e.g., to restart a binding).
-- `create_thing` / `update_thing` / `delete_thing`: Lifecycle management.
+- `get_items`: List all items with advanced filters (`tags`, `type`, `metadata`).
+- `get_item`: Detailed definition and current state of an item.
+- `send_command`: Send a command (e.g., `ON`, `50`, `OFF`) to an item.
+- `update_state`: Manually set an item's state.
+- `create_or_update_item`: Lifecycle management for items.
+- `delete_item`: Remove an item.
+- `get_room_status`: Summary of all items tagged in a specific room.
+- `add_tag` / `remove_tag`: Manage functional and semantic tags.
+- `set_metadata` / `remove_metadata`: Fine-grained configuration management.
 
-### 🔹 Semantic Model & Tags
-- `get_semantic_tags`: Retrieve the list of official semantic categories (Location, Equipment, Point).
-- `get_semantic_tag` / `create_semantic_tag` / `update_semantic_tag` / `delete_semantic_tag`: Manage the tags that power the OpenHAB UI model.
+### 🔹 Hardware & Connectivity
+
+- `get_things`: List all logical/physical Things.
+- `get_thing`: Detailed hardware configuration and UID mapping.
+- `get_thing_status`: Check if hardware is `ONLINE`, `OFFLINE`, etc.
+- `update_thing_config`: Modify hardware parameters.
+- `enable_thing`: Restart or disable a specific Thing.
+- `create_thing` / `update_thing` / `delete_thing`: Manage hardware lifecycle.
+- `get_inbox`: Review discovered devices waiting to be added.
+- `approve_inbox_item`: Promote a discovered device to a system Thing.
 
 ### 🔹 Automation & Rules
-- `get_rules`: List all defined automation rules.
-- `get_rule`: View the triggers, conditions, and actions of a rule.
-- `run_rule`: Manually trigger a rule to run immediately.
-- `enable_rule`: Enable or disable an automation.
-- `create_rule` / `update_rule` / `delete_rule`: Programmable rule management.
 
-### 🔹 Persistence & History
-- `get_persistence_services`: List available storage engines (e.g., RRD4j, InfluxDB).
-- `get_item_persistence_data`: Fetch historical state data for an item (supports `starttime` and `endtime`).
-- `store_item_persistence_data`: Manually insert a state into the database for a specific time.
+- `get_rules`: List all rule definitions.
+- `get_rule`: Inspect triggers, conditions, and actions.
+- `create_rule` / `update_rule` / `delete_rule`: Rule lifecycle.
+- `run_rule`: Manually trigger an automation.
+- `enable_rule`: Toggle automation logic.
 
-### 🔹 Voice & Interaction
-- `voice_say`: Text-to-speech output to a specific audio sink.
-- `voice_interpret`: Send a natural language string to OpenHAB's interpreter (Rule triggers, etc.).
-- `chat_with_habot`: Direct interaction with the HABot machine learning interface.
-- `get_voices` / `get_audio_sinks` / `get_audio_sources`: Discover audio hardware and TTS capabilities.
+### 🔹 Persistence & Analysis
 
-### 🔹 Discovery & Inbox
-- `get_inbox`: View discovered but unconfigured devices.
-- `approve_inbox_item`: Add a discovered device to the system.
-- `ignore_inbox_item` / `unignore_inbox_item`: Manage the discovery inbox.
+- `get_item_persistence_data`: Fetch historical raw data points.
+- `get_item_statistics`: Calculate peaks, averages, and duty cycles over time.
+- `store_item_persistence_data`: Manually insert state history.
+- `get_persistence_services`: List storage backends (RRD4j, InfluxDB, etc.).
 
-### 🔹 System & Maintenance
-- `get_system_info`: Detailed runtime info (OS, Java version, CPU, Memory).
-- `get_loggers` / `set_logger_level`: Monitor and adjust logging verbosity on the fly.
-- `get_addons` / `install_addon` / `uninstall_addon`: Manage system extensions and bindings.
-- `get_services` / `get_service_config` / `update_service_config`: Configure system-level services.
+### 🔹 Links & Semantic Model
 
-### 🔹 UI & Transformations
-- `get_sitemaps`: Retrieve classic UI sitemap definitions.
-- `get_ui_components` / `get_ui_tiles`: Access MainUI layout information.
-- `get_templates` / `get_transformations`: Manage data transformation logic.
+- `get_links`: View relationships between Items and Hardware Channels.
+- `link_item_to_channel`: Bind an item to a specific channel.
+- `unlink_item_from_channel`: Remove a binding.
+- `configure_link_profile`: Apply profiles like `system:follow` or `transform:JS` to a link.
+- `get_semantic_tags`: Retrieve standard Location/Equipment/Point tags.
+- `suggest_semantic_tags`: AI-driven tagging suggestions based on item naming.
+
+### 🔹 Media, Voice & Scenes
+
+- `control_media`: Context-aware controls (play, pause, next, volume) for any media item.
+- `capture_scene`: Save a snapshot of multiple item states as a Scene.
+- `activate_scene`: Restore a saved Scene state.
+- `voice_say`: Send text-to-speech to a specific speaker.
+- `voice_interpret`: Resolve natural language commands via OpenHAB's interpreter.
+- `chat_with_habot`: NLP interaction with the HABot interface.
+- `get_voices` / `get_audio_sinks` / `get_audio_sources`: Discover audio capabilities.
+
+### 🔹 UI & System Maintenance
+
+- `get_ui_components` / `get_ui_tiles`: Access MainUI layout data.
+- `generate_ui_widget`: Create MainUI YAML for custom dashboard widgets.
+- `get_system_info`: CPU, Memory, Java version, and OS details.
+- `get_loggers` / `set_logger_level`: Monitor and change log verbosity on the fly.
+- `get_addons` / `install_addon` / `uninstall_addon`: Manage system extensions.
+- `get_sitemaps`: Access legacy sitemap UI definitions.
+- `generate_system_boilerplate`: Create Typescript interfaces for your entire home.
 
 ## License
+
 MIT
