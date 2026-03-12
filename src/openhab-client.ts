@@ -1037,6 +1037,10 @@ export class OpenHabClient {
 
     context += `### Usage Tips\n`;
     context += `- Use \`execute_batch\` when the user asks for multiple actions (e.g. 'Goodnight').\n`;
+    context += `- Use \`get_semantic_path\` and \`find_neighboring_equipment\` to understand the spatial layout of the home.\n`;
+    context += `- Use \`schedule_command\` for delayed actions (e.g. 'turn off in 20 minutes').\n`;
+    context += `- Use \`trigger_discovery_scan\` if you suspect hardware is missing or unlinked.\n`;
+    context += `- Use \`get_stale_items\` for proactive maintenance of sensors.\n`;
     context += `- Use \`search_items\` if you are unsure of the exact hardware name.\n`;
     context += `- Refer to the \`openhab://schema\` resource for a full lightweight list of available controls.\n`;
 
@@ -1813,6 +1817,11 @@ blocks:
       'Auto-Generated Home Blueprint',
       'Comprehensive Safety Auditing',
       'Energy & Power Insights',
+      'Discovery Scan Triggering',
+      'Semantic Path breadcrumbs',
+      'Neighboring Equipment discovery',
+      'Future-dated Command Scheduling',
+      'Proactive Staleness Detection',
     ];
   }
 
@@ -1943,5 +1952,135 @@ blocks:
       totalNominalLoad:
         energyItems.reduce((acc, i) => acc + (parseFloat(i.state) || 0), 0).toFixed(2) + ' W/kWh',
     };
+  }
+
+  /**
+   * Enhancement: Triggers a manual discovery scan for a specific binding.
+   */
+  async triggerDiscoveryScan(bindingId: string): Promise<string> {
+    const response = await this.client.post(`/rest/discovery/bindings/${bindingId}/scan`);
+    return `Discovery scan triggered for binding: ${bindingId}. Check the inbox for new items.`;
+  }
+
+  /**
+   * Enhancement: Returns the full semantic path for an item (e.g., Lounge > Sofa > Light).
+   */
+  async getSemanticPath(itemName: string): Promise<string> {
+    const allItems = await this.getItems();
+    const item = allItems.find((i) => i.name === itemName);
+    if (!item) throw new Error(`Item ${itemName} not found.`);
+
+    const path: string[] = [item.label || item.name];
+    let current = item;
+
+    // Traverse upwards through groups
+    while (current.groupNames && current.groupNames.length > 0) {
+      // Find a parent that is part of the semantic model
+      const parent = allItems.find(
+        (i) =>
+          current.groupNames.includes(i.name) &&
+          i.tags?.some((t) =>
+            ['Location', 'Equipment', 'Point'].some((s) => t.toLowerCase().includes(s.toLowerCase()))
+          )
+      );
+
+      if (!parent) break;
+      path.unshift(parent.label || parent.name);
+      current = parent;
+    }
+
+    return path.join(' > ');
+  }
+
+  /**
+   * Enhancement: Finds equipment/points in the same location as the target item.
+   */
+  async findNeighboringEquipment(itemName: string): Promise<OpenHabItem[]> {
+    const allItems = await this.getItems();
+    const item = allItems.find((i) => i.name === itemName);
+    if (!item) throw new Error(`Item ${itemName} not found.`);
+
+    // Find the closest location parent
+    let locationParent: OpenHabItem | undefined;
+    let current = item;
+
+    while (current.groupNames && current.groupNames.length > 0) {
+      const parent = allItems.find(
+        (i) =>
+          current.groupNames.includes(i.name) &&
+          i.tags?.some((t) => t.toLowerCase().includes('location'))
+      );
+      if (parent) {
+        locationParent = parent;
+        break;
+      }
+      // If no location parent yet, try next group level
+      const nextParent = allItems.find((i) => current.groupNames.includes(i.name));
+      if (!nextParent) break;
+      current = nextParent;
+    }
+
+    if (!locationParent) return [];
+
+    // Find all items that share this location parent
+    return allItems.filter(
+      (i) => i.name !== itemName && i.groupNames?.includes(locationParent!.name)
+    );
+  }
+
+  /**
+   * Enhancement: Schedules a command to be sent after a delay.
+   */
+  async scheduleCommand(itemName: string, command: string, delayMs: number): Promise<string> {
+    this.log(`SCHEDULER: Queuing ${command} for ${itemName} in ${delayMs}ms`);
+    this.addLogToBuffer(
+      `${new Date().toISOString()} - ScheduledEvent - Queued ${command} for ${itemName} in ${delayMs}ms`
+    );
+
+    setTimeout(async () => {
+      try {
+        await this.sendCommand(itemName, command);
+        this.log(`SCHEDULER: Executed scheduled command ${command} on ${itemName}`);
+      } catch (err: any) {
+        this.log(`SCHEDULER ERROR: Failed to execute command on ${itemName}: ${err.message}`);
+      }
+    }, delayMs);
+
+    return `Command '${command}' successfully scheduled for item '${itemName}' in ${delayMs}ms.`;
+  }
+
+  /**
+   * Enhancement: Identifies items that haven't updated their state recently.
+   */
+  async getStaleItems(days = 7): Promise<Array<{ name: string; lastUpdate?: string }>> {
+    const items = await this.getItems(undefined, undefined, '.*'); // Get all items with metadata
+    const now = Date.now();
+    const threshold = days * 24 * 60 * 60 * 1000;
+    const stale: Array<{ name: string; lastUpdate?: string }> = [];
+
+    items.forEach((i) => {
+      // Try to find last update from metadata if the system supports it,
+      // or check the event logs if we have them.
+      // Since standard REST items don't have a 'lastUpdate' field without persistence,
+      // we check our event logs first.
+      const lastLog = this.eventLogBuffer
+        .reverse()
+        .find((l) => l.includes(`ItemStateChangedEvent - ${i.name}`));
+      this.eventLogBuffer.reverse(); // Restore original order
+
+      if (lastLog) {
+        const logTime = new Date(lastLog.split(' - ')[0]).getTime();
+        if (now - logTime > threshold) {
+          stale.push({ name: i.name, lastUpdate: new Date(logTime).toISOString() });
+        }
+      } else {
+        // If no log in buffer, and it's a sensor (Number), it might be stale
+        if (i.type === 'Number' || i.type === 'Contact') {
+          stale.push({ name: i.name, lastUpdate: 'Unknown (No recent event logs)' });
+        }
+      }
+    });
+
+    return stale;
   }
 }

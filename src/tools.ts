@@ -586,6 +586,58 @@ export function registerTools(server: Server, client: OpenHabClient) {
             'Aggregates power/energy sensor data into a high-level consumption and efficiency report.',
           inputSchema: { type: 'object', properties: {} },
         },
+        {
+          name: 'trigger_discovery_scan',
+          description: 'Triggers a manual discovery scan for a specific binding.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              bindingId: { type: 'string', description: 'The binding ID (e.g. hue, sonos)' },
+            },
+            required: ['bindingId'],
+          },
+        },
+        {
+          name: 'get_semantic_path',
+          description: 'Returns the full semantic path for an item (e.g., Lounge > Sofa > Light).',
+          inputSchema: {
+            type: 'object',
+            properties: { itemName: { type: 'string' } },
+            required: ['itemName'],
+          },
+        },
+        {
+          name: 'find_neighboring_equipment',
+          description: 'Finds equipment/points in the same location as the target item.',
+          inputSchema: {
+            type: 'object',
+            properties: { itemName: { type: 'string' } },
+            required: ['itemName'],
+          },
+        },
+        {
+          name: 'schedule_command',
+          description: 'Schedules a command to be sent after a delay.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              itemName: { type: 'string' },
+              command: { type: 'string' },
+              delayMs: { type: 'number', description: 'Delay in milliseconds' },
+            },
+            required: ['itemName', 'command', 'delayMs'],
+          },
+        },
+        {
+          name: 'get_stale_items',
+          description: 'Identifies items that haven’t updated their state recently.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              days: { type: 'number', description: 'Number of days to check for staleness' },
+            },
+          },
+        },
 
         // --- Things ---
         {
@@ -1436,6 +1488,37 @@ export function registerTools(server: Server, client: OpenHabClient) {
         }
         case 'calculate_energy_insights': {
           result = await client.calculateEnergyInsights();
+          break;
+        }
+        case 'trigger_discovery_scan': {
+          const { bindingId } = z.object({ bindingId: z.string() }).parse(args);
+          result = await client.triggerDiscoveryScan(bindingId);
+          break;
+        }
+        case 'get_semantic_path': {
+          const { itemName } = z.object({ itemName: z.string() }).parse(args);
+          result = await client.getSemanticPath(itemName);
+          break;
+        }
+        case 'find_neighboring_equipment': {
+          const { itemName } = z.object({ itemName: z.string() }).parse(args);
+          result = await client.findNeighboringEquipment(itemName);
+          break;
+        }
+        case 'schedule_command': {
+          const { itemName, command, delayMs } = z
+            .object({
+              itemName: z.string(),
+              command: z.string(),
+              delayMs: z.number(),
+            })
+            .parse(args);
+          result = await client.scheduleCommand(itemName, command, delayMs);
+          break;
+        }
+        case 'get_stale_items': {
+          const { days } = z.object({ days: z.number().optional() }).parse(args);
+          result = await client.getStaleItems(days);
           break;
         }
 

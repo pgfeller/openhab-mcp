@@ -130,6 +130,10 @@ Tools designed to automate complex workflows and provide AI-friendly context.
 - `generate_home_blueprint`: Auto-generates a structured Markdown manual of your entire home model.
 - `audit_system_safety`: Proactive scanner for security items (Locks, Alarms) with safety check logic.
 - `calculate_energy_insights`: Aggregates energy/power data into a high-level consumption report.
+- `get_semantic_path`: Returns the full semantic path for an item (e.g., Lounge > Sofa > Light).
+- `find_neighboring_equipment`: AI-driven search for other devices in the same physical location.
+- `schedule_command`: Schedules a command for the future (e.g., "turn off in 10 minutes").
+- `get_stale_items`: Identifies sensors or items that haven't updated in a specified period.
 - `test_transformation`: Evaluate REGEX or JSONPATH patterns locally.
 - `get_recent_logs`: Real-time tail of the OpenHAB event stream (items, commands, things).
 - `get_visual_chart`: Generates ASCII sparkline charts for an item's recent history.
@@ -157,6 +161,7 @@ Tools designed to automate complex workflows and provide AI-friendly context.
 - `create_thing` / `update_thing` / `delete_thing`: Manage hardware lifecycle.
 - `get_inbox`: Review discovered devices waiting to be added.
 - `approve_inbox_item`: Promote a discovered device to a system Thing.
+- `trigger_discovery_scan`: Manually trigger a hardware scan for a specific binding (e.g., Hue, Sonos).
 
 ### 🔹 Automation & Rules
 
