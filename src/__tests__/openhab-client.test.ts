@@ -533,6 +533,18 @@ describe('OpenHabClient', () => {
       await expect(client.getItems()).rejects.toThrow(/OpenHAB API Error: 404/);
     });
 
+    it('should add a hint for 401 errors on things endpoint', async () => {
+      mock.onGet(`${baseUrl}/rest/things`).reply(401, { message: 'Unauthorized' });
+      await expect(client.getThings()).rejects.toThrow(/require "Admin" or "Full Access" token scopes/);
+    });
+
+    it('should NOT add a hint for 401 errors on items endpoint', async () => {
+      mock.onGet(`${baseUrl}/rest/items`).reply(401, { message: 'Unauthorized' });
+      const error = await client.getItems().catch((e) => e.message);
+      expect(error).toContain('OpenHAB API Error: 401');
+      expect(error).not.toContain('require "Admin" or "Full Access" token scopes');
+    });
+
     it('should throw network errors', async () => {
       mock.onGet(`${baseUrl}/rest/items`).networkError();
       await expect(client.getItems()).rejects.toThrow(/OpenHAB (Network|Request) Error/);

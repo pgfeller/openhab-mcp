@@ -23,6 +23,7 @@ describe('MCP Tools Integration', () => {
 
     mockClient = {
       // Items
+      getSystemSummary: mockMethod(),
       getItems: mockMethod(),
       getItem: mockMethod(),
       sendCommand: mockMethod(),
@@ -46,6 +47,7 @@ describe('MCP Tools Integration', () => {
       getLinks: mockMethod(),
       linkItemToChannel: mockMethod(),
       unlinkItemFromChannel: mockMethod(),
+      configureLinkProfile: mockMethod(),
       // Semantic Tags
       getSemanticTags: mockMethod(),
       createSemanticTag: mockMethod(),
@@ -93,6 +95,16 @@ describe('MCP Tools Integration', () => {
       getTemplates: mockMethod(),
       getTransformations: mockMethod(),
       chatWithHabot: mockMethod(),
+      // Mastery
+      searchItems: mockMethod(),
+      analyzeSystemHealth: mockMethod(),
+      generateTopology: mockMethod(),
+      explainItemState: mockMethod(),
+      executeBatch: mockMethod(),
+      captureScene: mockMethod(),
+      activateScene: mockMethod(),
+      getPromptContext: mockMethod(),
+      getRecentLogs: mockMethod(),
     } as any;
 
     registerTools(mockServer, mockClient);
@@ -100,7 +112,7 @@ describe('MCP Tools Integration', () => {
 
   describe('Tool Dispatch Matrix', () => {
     const testCases = [
-      // Items
+      // --- Core Items ---
       {
         tool: 'get_items',
         args: { tags: 't', type: 'S', metadata: 'm' },
@@ -132,194 +144,172 @@ describe('MCP Tools Integration', () => {
         clientMethod: 'deleteItem',
         expectedArgs: ['i'],
       },
+
+      // --- Item Modifications (Consolidated) ---
       {
-        tool: 'add_tag',
-        args: { itemName: 'i', tag: 't' },
+        tool: 'manage_item_tag',
+        args: { itemName: 'i', tag: 't', action: 'add' },
         clientMethod: 'addTag',
         expectedArgs: ['i', 't'],
       },
       {
-        tool: 'remove_tag',
-        args: { itemName: 'i', tag: 't' },
+        tool: 'manage_item_tag',
+        args: { itemName: 'i', tag: 't', action: 'remove' },
         clientMethod: 'removeTag',
         expectedArgs: ['i', 't'],
       },
       {
-        tool: 'set_metadata',
-        args: { itemName: 'i', namespace: 'n', value: 'v', config: { c: 1 } },
+        tool: 'manage_item_metadata',
+        args: { itemName: 'i', namespace: 'n', value: 'v', config: { c: 1 }, action: 'set' },
         clientMethod: 'setMetadata',
         expectedArgs: ['i', 'n', 'v', { c: 1 }],
       },
       {
-        tool: 'remove_metadata',
-        args: { itemName: 'i', namespace: 'n' },
+        tool: 'manage_item_metadata',
+        args: { itemName: 'i', namespace: 'n', action: 'remove' },
         clientMethod: 'removeMetadata',
         expectedArgs: ['i', 'n'],
       },
 
-      // Things
+      // --- Hardware & Things (Consolidated) ---
       { tool: 'get_things', args: {}, clientMethod: 'getThings', expectedArgs: [] },
       { tool: 'get_thing', args: { thingUID: 'u' }, clientMethod: 'getThing', expectedArgs: ['u'] },
       {
-        tool: 'create_thing',
-        args: { thingData: { t: 1 } },
+        tool: 'manage_thing',
+        args: { action: 'create', thingData: { t: 1 } },
         clientMethod: 'createThing',
         expectedArgs: [{ t: 1 }],
       },
       {
-        tool: 'update_thing',
-        args: { thingUID: 'u', thingData: { t: 2 } },
+        tool: 'manage_thing',
+        args: { action: 'update', thingUID: 'u', thingData: { t: 2 } },
         clientMethod: 'updateThing',
         expectedArgs: ['u', { t: 2 }],
       },
       {
-        tool: 'delete_thing',
-        args: { thingUID: 'u', force: true },
+        tool: 'manage_thing',
+        args: { action: 'delete', thingUID: 'u', force: true },
         clientMethod: 'deleteThing',
         expectedArgs: ['u', true],
       },
       {
-        tool: 'enable_thing',
-        args: { thingUID: 'u', enable: true },
+        tool: 'manage_thing',
+        args: { action: 'enable', thingUID: 'u' },
         clientMethod: 'enableThing',
         expectedArgs: ['u', true],
       },
       {
-        tool: 'get_thing_status',
-        args: { thingUID: 'u' },
-        clientMethod: 'getThingStatus',
-        expectedArgs: ['u'],
+        tool: 'manage_thing',
+        args: { action: 'disable', thingUID: 'u' },
+        clientMethod: 'enableThing',
+        expectedArgs: ['u', false],
       },
       {
-        tool: 'update_thing_config',
-        args: { thingUID: 'u', config: { c: 1 } },
+        tool: 'manage_thing',
+        args: { action: 'configure', thingUID: 'u', config: { c: 1 } },
         clientMethod: 'updateThingConfig',
         expectedArgs: ['u', { c: 1 }],
       },
+      { tool: 'get_thing_status', args: { thingUID: 'u' }, clientMethod: 'getThingStatus', expectedArgs: ['u'] },
 
-      // Links
-      {
-        tool: 'get_links',
-        args: { itemName: 'i', channelUID: 'c' },
-        clientMethod: 'getLinks',
-        expectedArgs: ['i', 'c'],
-      },
-      {
-        tool: 'link_item_to_channel',
-        args: { itemName: 'i', channelUID: 'c', config: { k: 1 } },
-        clientMethod: 'linkItemToChannel',
-        expectedArgs: ['i', 'c', { k: 1 }],
-      },
-      {
-        tool: 'unlink_item_from_channel',
-        args: { itemName: 'i', channelUID: 'c' },
-        clientMethod: 'unlinkItemFromChannel',
-        expectedArgs: ['i', 'c'],
-      },
-
-      // Semantic Tags
-      { tool: 'get_semantic_tags', args: {}, clientMethod: 'getSemanticTags', expectedArgs: [] },
-      {
-        tool: 'create_semantic_tag',
-        args: { tagData: { id: 't' } },
-        clientMethod: 'createSemanticTag',
-        expectedArgs: [{ id: 't' }],
-      },
-      {
-        tool: 'get_semantic_tag',
-        args: { tagId: 't' },
-        clientMethod: 'getSemanticTag',
-        expectedArgs: ['t'],
-      },
-      {
-        tool: 'update_semantic_tag',
-        args: { tagId: 't', tagData: { id: 't', l: 'l' } },
-        clientMethod: 'updateSemanticTag',
-        expectedArgs: ['t', { id: 't', l: 'l' }],
-      },
-      {
-        tool: 'delete_semantic_tag',
-        args: { tagId: 't' },
-        clientMethod: 'deleteSemanticTag',
-        expectedArgs: ['t'],
-      },
-
-      // Rules
+      // --- Rules & Automation (Consolidated) ---
       { tool: 'get_rules', args: {}, clientMethod: 'getRules', expectedArgs: [] },
       { tool: 'get_rule', args: { ruleUID: 'u' }, clientMethod: 'getRule', expectedArgs: ['u'] },
       {
-        tool: 'create_rule',
-        args: { ruleData: { r: 1 } },
+        tool: 'manage_rule',
+        args: { action: 'create', ruleData: { r: 1 } },
         clientMethod: 'createRule',
         expectedArgs: [{ r: 1 }],
       },
       {
-        tool: 'update_rule',
-        args: { ruleUID: 'u', ruleData: { r: 2 } },
+        tool: 'manage_rule',
+        args: { action: 'update', ruleUID: 'u', ruleData: { r: 2 } },
         clientMethod: 'updateRule',
         expectedArgs: ['u', { r: 2 }],
       },
       {
-        tool: 'delete_rule',
-        args: { ruleUID: 'u' },
+        tool: 'manage_rule',
+        args: { action: 'delete', ruleUID: 'u' },
         clientMethod: 'deleteRule',
         expectedArgs: ['u'],
       },
       {
-        tool: 'run_rule',
-        args: { ruleUID: 'u' },
-        clientMethod: 'runRule',
-        expectedArgs: ['u', undefined],
-      },
-      {
-        tool: 'enable_rule',
-        args: { ruleUID: 'u', enable: true },
+        tool: 'manage_rule',
+        args: { action: 'enable', ruleUID: 'u' },
         clientMethod: 'enableRule',
         expectedArgs: ['u', true],
       },
-
-      // Inbox
-      { tool: 'get_inbox', args: {}, clientMethod: 'getInbox', expectedArgs: [] },
       {
-        tool: 'approve_inbox_item',
-        args: { thingUID: 'u', label: 'l', newThingId: 'n' },
-        clientMethod: 'approveInboxItem',
-        expectedArgs: ['u', 'l', 'n'],
+        tool: 'manage_rule',
+        args: { action: 'disable', ruleUID: 'u' },
+        clientMethod: 'enableRule',
+        expectedArgs: ['u', false],
       },
       {
-        tool: 'ignore_inbox_item',
-        args: { thingUID: 'u' },
-        clientMethod: 'ignoreInboxItem',
-        expectedArgs: ['u'],
-      },
-      {
-        tool: 'unignore_inbox_item',
-        args: { thingUID: 'u' },
-        clientMethod: 'unignoreInboxItem',
+        tool: 'manage_rule',
+        args: { action: 'run', ruleUID: 'u' },
+        clientMethod: 'runRule',
         expectedArgs: ['u'],
       },
 
-      // Persistence
+      // --- Semantic Model (Consolidated) ---
       {
-        tool: 'get_persistence_services',
-        args: {},
-        clientMethod: 'getPersistenceServices',
+        tool: 'manage_semantic_tag',
+        args: { action: 'create', tagData: { id: 't' } },
+        clientMethod: 'createSemanticTag',
+        expectedArgs: [{ id: 't' }],
+      },
+      {
+        tool: 'manage_semantic_tag',
+        args: { action: 'update', tagId: 't', tagData: { id: 't2' } },
+        clientMethod: 'updateSemanticTag',
+        expectedArgs: ['t', { id: 't2' }],
+      },
+      {
+        tool: 'manage_semantic_tag',
+        args: { action: 'delete', tagId: 't' },
+        clientMethod: 'deleteSemanticTag',
+        expectedArgs: ['t'],
+      },
+      {
+        tool: 'manage_link',
+        args: { action: 'link', itemName: 'i', channelUID: 'c', config: { k: 1 } },
+        clientMethod: 'linkItemToChannel',
+        expectedArgs: ['i', 'c', { k: 1 }],
+      },
+      {
+        tool: 'manage_link',
+        args: { action: 'unlink', itemName: 'i', channelUID: 'c' },
+        clientMethod: 'unlinkItemFromChannel',
+        expectedArgs: ['i', 'c'],
+      },
+      {
+        tool: 'manage_link',
+        args: { action: 'configure', itemName: 'i', channelUID: 'c', profile: 'p', profileConfig: { k: 1 } },
+        clientMethod: 'configureLinkProfile',
+        expectedArgs: ['i', 'c', 'p', { k: 1 }],
+      },
+      { tool: 'get_semantic_tags', args: {}, clientMethod: 'getSemanticTags', expectedArgs: [] },
+
+      // --- System Management ---
+      {
+        tool: 'get_audio_info',
+        args: { type: 'sinks' },
+        clientMethod: 'getAudioSinks',
         expectedArgs: [],
       },
       {
-        tool: 'get_item_persistence_data',
-        args: { itemName: 'i', serviceId: 's', starttime: 's1', endtime: 'e1' },
-        clientMethod: 'getItemPersistenceData',
-        expectedArgs: ['i', 's', 's1', 'e1'],
+        tool: 'get_audio_info',
+        args: { type: 'sources' },
+        clientMethod: 'getAudioSources',
+        expectedArgs: [],
       },
       {
-        tool: 'store_item_persistence_data',
-        args: { itemName: 'i', time: 't', state: 's', serviceId: 's1' },
-        clientMethod: 'storeItemPersistenceData',
-        expectedArgs: ['i', 't', 's', 's1'],
+        tool: 'get_audio_info',
+        args: { type: 'voices' },
+        clientMethod: 'getVoices',
+        expectedArgs: [],
       },
-
-      // Voice
       {
         tool: 'voice_say',
         args: { text: 'h', sinkId: 's' },
@@ -332,70 +322,96 @@ describe('MCP Tools Integration', () => {
         clientMethod: 'voiceInterpret',
         expectedArgs: ['h', 'i'],
       },
-      { tool: 'get_voices', args: {}, clientMethod: 'getVoices', expectedArgs: [] },
-      { tool: 'get_audio_sinks', args: {}, clientMethod: 'getAudioSinks', expectedArgs: [] },
-      { tool: 'get_audio_sources', args: {}, clientMethod: 'getAudioSources', expectedArgs: [] },
-
-      // Addons
-      { tool: 'get_addons', args: {}, clientMethod: 'getAddons', expectedArgs: [] },
       {
-        tool: 'install_addon',
-        args: { addonId: 'a' },
+        tool: 'manage_addon',
+        args: { action: 'install', addonId: 'a' },
         clientMethod: 'installAddon',
         expectedArgs: ['a'],
       },
       {
-        tool: 'uninstall_addon',
-        args: { addonId: 'a' },
+        tool: 'manage_addon',
+        args: { action: 'uninstall', addonId: 'a' },
         clientMethod: 'uninstallAddon',
         expectedArgs: ['a'],
       },
-
-      // UI
-      { tool: 'get_sitemaps', args: {}, clientMethod: 'getSitemaps', expectedArgs: [] },
       {
-        tool: 'get_ui_components',
-        args: { namespace: 'n' },
-        clientMethod: 'getUIComponents',
-        expectedArgs: ['n'],
+        tool: 'manage_inbox',
+        args: { action: 'approve', thingUID: 'u', label: 'l', newThingId: 'n' },
+        clientMethod: 'approveInboxItem',
+        expectedArgs: ['u', 'l', 'n'],
       },
-      { tool: 'get_ui_tiles', args: {}, clientMethod: 'getUITiles', expectedArgs: [] },
-
-      // System
-      { tool: 'get_system_info', args: {}, clientMethod: 'getSystemInfo', expectedArgs: [] },
-      { tool: 'get_loggers', args: {}, clientMethod: 'getLoggers', expectedArgs: [] },
       {
-        tool: 'set_logger_level',
-        args: { loggerName: 'l', level: 'I' },
-        clientMethod: 'setLoggerLevel',
-        expectedArgs: ['l', 'I'],
+        tool: 'manage_inbox',
+        args: { action: 'ignore', thingUID: 'u' },
+        clientMethod: 'ignoreInboxItem',
+        expectedArgs: ['u'],
       },
-      { tool: 'get_services', args: {}, clientMethod: 'getServices', expectedArgs: [] },
       {
-        tool: 'get_service_config',
-        args: { serviceId: 's' },
+        tool: 'manage_inbox',
+        args: { action: 'unignore', thingUID: 'u' },
+        clientMethod: 'unignoreInboxItem',
+        expectedArgs: ['u'],
+      },
+
+      // --- Configuration ---
+      {
+        tool: 'get_system_registry',
+        args: { type: 'services' },
+        clientMethod: 'getServices',
+        expectedArgs: [],
+      },
+      {
+        tool: 'get_system_registry',
+        args: { type: 'loggers' },
+        clientMethod: 'getLoggers',
+        expectedArgs: [],
+      },
+      {
+        tool: 'manage_service_config',
+        args: { action: 'get', serviceId: 's' },
         clientMethod: 'getServiceConfig',
         expectedArgs: ['s'],
       },
       {
-        tool: 'update_service_config',
-        args: { serviceId: 's', config: { c: 1 } },
+        tool: 'manage_service_config',
+        args: { action: 'update', serviceId: 's', config: { k: 1 } },
         clientMethod: 'updateServiceConfig',
-        expectedArgs: ['s', { c: 1 }],
+        expectedArgs: ['s', { k: 1 }],
       },
-      { tool: 'get_templates', args: {}, clientMethod: 'getTemplates', expectedArgs: [] },
       {
-        tool: 'get_transformations',
-        args: {},
-        clientMethod: 'getTransformations',
+        tool: 'manage_logger',
+        args: { action: 'list' },
+        clientMethod: 'getLoggers',
         expectedArgs: [],
       },
       {
-        tool: 'chat_with_habot',
-        args: { text: 'h' },
-        clientMethod: 'chatWithHabot',
-        expectedArgs: ['h'],
+        tool: 'manage_logger',
+        args: { action: 'set', loggerName: 'l', level: 'I' },
+        clientMethod: 'setLoggerLevel',
+        expectedArgs: ['l', 'I'],
       },
+
+      // --- Advanced Mastery ---
+      { tool: 'search_items', args: { query: 'q' }, clientMethod: 'searchItems', expectedArgs: ['q'] },
+      { tool: 'analyze_system_health', args: {}, clientMethod: 'analyzeSystemHealth', expectedArgs: [] },
+      { tool: 'generate_topology', args: {}, clientMethod: 'generateTopology', expectedArgs: [] },
+      { tool: 'explain_item_state', args: { itemName: 'i' }, clientMethod: 'explainItemState', expectedArgs: ['i'] },
+      {
+        tool: 'execute_batch',
+        args: { commands: [{ itemName: 'i', command: 'c' }] },
+        clientMethod: 'executeBatch',
+        expectedArgs: [[{ itemName: 'i', command: 'c' }]],
+      },
+      {
+        tool: 'capture_scene',
+        args: { name: 'n', itemNames: ['i'] },
+        clientMethod: 'captureScene',
+        expectedArgs: ['n', ['i']],
+      },
+      { tool: 'activate_scene', args: { name: 'n' }, clientMethod: 'activateScene', expectedArgs: ['n'] },
+      { tool: 'get_prompt_context', args: {}, clientMethod: 'getPromptContext', expectedArgs: [] },
+      { tool: 'get_recent_logs', args: { lines: 10 }, clientMethod: 'getRecentLogs', expectedArgs: [10] },
+      { tool: 'chat_with_habot', args: { text: 'h' }, clientMethod: 'chatWithHabot', expectedArgs: ['h'] },
     ];
 
     testCases.forEach(({ tool, args, clientMethod, expectedArgs }) => {

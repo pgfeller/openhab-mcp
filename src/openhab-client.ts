@@ -60,8 +60,15 @@ export class OpenHabClient {
       (response) => response,
       (error) => {
         if (error.response) {
+          let hint = '';
+          if (error.response.status === 401) {
+            const endpoint = error.config?.url || '';
+            if (endpoint.includes('/rest/things') || endpoint.includes('/rest/systeminfo')) {
+              hint = ' - This endpoint may require "Admin" or "Full Access" token scopes.';
+            }
+          }
           throw new Error(
-            `OpenHAB API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}`
+            `OpenHAB API Error: ${error.response.status} - ${JSON.stringify(error.response.data)}${hint}`
           );
         } else if (error.request) {
           throw new Error(`OpenHAB Network Error: No response received connecting to ${baseUrl}`);
@@ -285,11 +292,13 @@ export class OpenHabClient {
   }
 
   async addTag(itemName: string, tag: string): Promise<void> {
+    this.invalidateItemCache(itemName);
     const response = await this.client.put(`/rest/items/${itemName}/tags/${tag}`);
     return response.data;
   }
 
   async removeTag(itemName: string, tag: string): Promise<void> {
+    this.invalidateItemCache(itemName);
     const response = await this.client.delete(`/rest/items/${itemName}/tags/${tag}`);
     return response.data;
   }
@@ -300,12 +309,14 @@ export class OpenHabClient {
     value: string,
     config?: Record<string, unknown>
   ): Promise<void> {
+    this.invalidateItemCache(itemName);
     const data = { value, config };
     const response = await this.client.put(`/rest/items/${itemName}/metadata/${namespace}`, data);
     return response.data;
   }
 
   async removeMetadata(itemName: string, namespace: string): Promise<void> {
+    this.invalidateItemCache(itemName);
     const response = await this.client.delete(`/rest/items/${itemName}/metadata/${namespace}`);
     return response.data;
   }
@@ -781,7 +792,7 @@ export class OpenHabClient {
 
   async getLoggers(): Promise<OpenHabLogger[]> {
     const response = await this.client.get('/rest/logging');
-    return response.data;
+    return response.data.loggers || [];
   }
 
   async setLoggerLevel(loggerName: string, level: string): Promise<void> {
