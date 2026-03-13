@@ -321,14 +321,36 @@ export function registerTools(server: Server, client: OpenHabClient) {
           inputSchema: { type: 'object', properties: {} },
         },
 
-        // --- Advanced Mastery Tools ---
+        {
+          name: 'initial_discovery',
+          description: 'One-shot bootstrap to get system context and full schema at once',
+          inputSchema: { type: 'object', properties: {} },
+        },
         {
           name: 'search_items',
-          description: 'Fuzzy search for items',
+          description: 'Broad fuzzy search for items by name, label, tags, or groups',
           inputSchema: {
             type: 'object',
             properties: { query: { type: 'string' } },
             required: ['query'],
+          },
+        },
+        {
+          name: 'master_search',
+          description: 'Unified search across items, things, and rules in one call',
+          inputSchema: {
+            type: 'object',
+            properties: { query: { type: 'string' } },
+            required: ['query'],
+          },
+        },
+        {
+          name: 'get_room_inventory',
+          description: 'Get all equipment and items in a specific room (e.g. "Kitchen")',
+          inputSchema: {
+            type: 'object',
+            properties: { roomName: { type: 'string' } },
+            required: ['roomName'],
           },
         },
         {
@@ -393,12 +415,125 @@ export function registerTools(server: Server, client: OpenHabClient) {
         },
         {
           name: 'get_recent_logs',
-          description: 'Fetch the recent event stream buffer',
+          description: 'Fetch the recent event stream buffer (last 100 events)',
           inputSchema: {
             type: 'object',
             properties: {
               lines: { type: 'number' },
             },
+          },
+        },
+        {
+          name: 'get_historical_logs',
+          description: 'Fetch a larger window of historical log events for deep review (up to 5000 lines)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              lines: { type: 'number', description: 'Number of lines to return (max 5000)' },
+              search: { type: 'string', description: 'Optional text filter' },
+            },
+          },
+        },
+        {
+          name: 'get_mcp_health',
+          description: 'Get real-time health metrics for the MCP server (SSE status, cache, buffer)',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'get_mcp_capabilities',
+          description: 'List all active advanced mastery capabilities of this MCP',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'summarize_persistence_range',
+          description: 'Get a statistical summary of an item over a time range (peakes, averages, trends)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              itemName: { type: 'string' },
+              startTime: { type: 'string', description: 'ISO8601 start time' },
+              endTime: { type: 'string', description: 'ISO8601 end time' },
+            },
+            required: ['itemName', 'startTime', 'endTime'],
+          },
+        },
+        {
+          name: 'simulate_system_state',
+          description: 'Predict the outcome of a command including potential rule trigger chains',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              itemName: { type: 'string' },
+              command: { type: 'string' },
+            },
+            required: ['itemName', 'command'],
+          },
+        },
+        {
+          name: 'generate_home_blueprint',
+          description: 'Generate a comprehensive Markdown guide of the entire home system',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'audit_system_safety',
+          description: 'Security audit of items tagged with Security/Safety',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'calculate_energy_insights',
+          description: 'Aggregate energy consumption across the home',
+          inputSchema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'get_semantic_path',
+          description: 'Get the full semantic location path for an item',
+          inputSchema: {
+            type: 'object',
+            properties: { itemName: { type: 'string' } },
+            required: ['itemName'],
+          },
+        },
+        {
+          name: 'find_neighboring_equipment',
+          description: 'Find other equipment in the same location as the target item',
+          inputSchema: {
+            type: 'object',
+            properties: { itemName: { type: 'string' } },
+            required: ['itemName'],
+          },
+        },
+        {
+          name: 'schedule_command',
+          description: 'Schedule a command for the future',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              itemName: { type: 'string' },
+              command: { type: 'string' },
+              delayMs: { type: 'number' },
+            },
+            required: ['itemName', 'command', 'delayMs'],
+          },
+        },
+        {
+          name: 'get_stale_items',
+          description: 'Identify sensors that haven\'t updated in a while',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              days: { type: 'number', description: 'Staleness threshold in days' },
+            },
+          },
+        },
+        {
+          name: 'trigger_discovery_scan',
+          description: 'Trigger a manual hardware scan for a binding',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              bindingId: { type: 'string', description: 'e.g., hue, sonos' },
+            },
+            required: ['bindingId'],
           },
         },
         {
@@ -664,9 +799,22 @@ export function registerTools(server: Server, client: OpenHabClient) {
           break;
 
         // --- Advanced Mastery Tools ---
+        case 'initial_discovery':
+          result = await client.initialDiscovery();
+          break;
         case 'search_items': {
           const { query } = z.object({ query: z.string() }).parse(args);
           result = await client.searchItems(query);
+          break;
+        }
+        case 'master_search': {
+          const { query } = z.object({ query: z.string() }).parse(args);
+          result = await client.masterSearch(query);
+          break;
+        }
+        case 'get_room_inventory': {
+          const { roomName } = z.object({ roomName: z.string() }).parse(args);
+          result = await client.getRoomInventory(roomName);
           break;
         }
         case 'analyze_system_health':
@@ -705,6 +853,61 @@ export function registerTools(server: Server, client: OpenHabClient) {
         case 'get_recent_logs': {
           const { lines } = z.object({ lines: z.number().optional() }).parse(args);
           result = await client.getRecentLogs(lines);
+          break;
+        }
+        case 'get_historical_logs': {
+          const { lines, search } = z.object({ lines: z.number().optional(), search: z.string().optional() }).parse(args);
+          result = await client.getHistoricalLogs(lines, search);
+          break;
+        }
+        case 'get_mcp_health':
+          result = client.getMcpHealth();
+          break;
+        case 'get_mcp_capabilities':
+          result = client.getMcpCapabilities();
+          break;
+        case 'summarize_persistence_range': {
+          const { itemName, startTime, endTime } = z.object({ itemName: z.string(), startTime: z.string(), endTime: z.string() }).parse(args);
+          result = await client.summarizePersistenceRange(itemName, startTime, endTime);
+          break;
+        }
+        case 'simulate_system_state': {
+          const { itemName, command } = z.object({ itemName: z.string(), command: z.string() }).parse(args);
+          result = await client.simulateSystemState(itemName, command);
+          break;
+        }
+        case 'generate_home_blueprint':
+          result = await client.generateHomeBlueprint();
+          break;
+        case 'audit_system_safety':
+          result = await client.auditSystemSafety();
+          break;
+        case 'calculate_energy_insights':
+          result = await client.calculateEnergyInsights();
+          break;
+        case 'get_semantic_path': {
+          const { itemName } = z.object({ itemName: z.string() }).parse(args);
+          result = await client.getSemanticPath(itemName);
+          break;
+        }
+        case 'find_neighboring_equipment': {
+          const { itemName } = z.object({ itemName: z.string() }).parse(args);
+          result = await client.findNeighboringEquipment(itemName);
+          break;
+        }
+        case 'schedule_command': {
+          const { itemName, command, delayMs } = z.object({ itemName: z.string(), command: z.string(), delayMs: z.number() }).parse(args);
+          result = await client.scheduleCommand(itemName, command, delayMs);
+          break;
+        }
+        case 'get_stale_items': {
+          const { days } = z.object({ days: z.number().optional() }).parse(args);
+          result = await client.getStaleItems(days);
+          break;
+        }
+        case 'trigger_discovery_scan': {
+          const { bindingId } = z.object({ bindingId: z.string() }).parse(args);
+          result = await client.triggerDiscoveryScan(bindingId);
           break;
         }
         case 'chat_with_habot': {

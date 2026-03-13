@@ -29,8 +29,10 @@ export class OpenHabClient {
   private reconnectTimeout = 1000;
   private readonly enableSSE: boolean;
   private eventLogBuffer: string[] = [];
-  private readonly MAX_LOG_BUFFER = 100;
+  private readonly MAX_LOG_BUFFER = 5000;
   private focusScope: { type: 'room' | 'group'; name: string } | null = null;
+  private searchIndex: Map<string, any> = new Map();
+  private lastIndexUpdate = 0;
 
   constructor(
     baseUrl: string,
@@ -81,6 +83,13 @@ export class OpenHabClient {
     if (this.enableSSE) {
       this.initEventStream();
     }
+
+    // Optimization: Background pre-warm of items/things cache to make first interaction instant
+    setTimeout(() => {
+      this.log('Pre-warming cache...');
+      this.getItems().catch(() => {});
+      this.getThings().catch(() => {});
+    }, 100);
   }
 
   private log(message: string): void {
@@ -1000,31 +1009,111 @@ export class OpenHabClient {
   }
 
   /**
-   * Fuzzy search for items by name, label, or room.
+   * Fuzzy search for items by name, label, tags, or groups.
    */
   async searchItems(query: string): Promise<OpenHabItem[]> {
-    const q = query.toLowerCase();
+    const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    if (terms.length === 0) return [];
+    
     const allItems = await this.getItems();
 
     return allItems
-      .filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          i.label?.toLowerCase().includes(q) ||
-          i.tags?.some((t) => t.toLowerCase().includes(q))
-      )
-      .slice(0, 15); // Return top matches
+      .filter((i) => {
+        const haystack = `${i.name} ${i.label || ''} ${i.tags?.join(' ') || ''} ${i.groupNames?.join(' ') || ''}`.toLowerCase();
+        return terms.every(term => haystack.includes(term));
+      })
+      .slice(0, 50);
+  }
+
+  /**
+   * Unified search across items, things, and rules.
+   * Reduces multiple MCP calls when entity type is unknown.
+   */
+  async masterSearch(query: string): Promise<{
+    items: OpenHabItem[];
+    things: OpenHabThing[];
+    rules: OpenHabRule[];
+  }> {
+    const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+    if (terms.length === 0) return { items: [], things: [], rules: [] };
+    
+    // Fetch all in parallel for speed
+    const [items, things, rules] = await Promise.all([
+      this.getItems(),
+      this.getThings(),
+      this.getRules()
+    ]);
+
+    return {
+      items: items.filter(i => {
+        const haystack = `${i.name} ${i.label || ''} ${i.tags?.join(' ') || ''}`.toLowerCase();
+        return terms.every(term => haystack.includes(term));
+      }).slice(0, 20),
+      things: things.filter(t => {
+        const haystack = `${t.UID} ${t.label || ''}`.toLowerCase();
+        return terms.every(term => haystack.includes(term));
+      }).slice(0, 10),
+      rules: rules.filter(r => {
+        const haystack = `${r.uid} ${r.name || ''}`.toLowerCase();
+        return terms.every(term => haystack.includes(term));
+      }).slice(0, 10)
+    };
+  }
+
+  /**
+   * Gets all equipment and items in a specific room.
+   * Uses semantic model traversal.
+   */
+  async getRoomInventory(roomName: string): Promise<{
+    room: OpenHabItem;
+    equipment: Array<{ info: OpenHabItem; points: OpenHabItem[] }>;
+    standaloneItems: OpenHabItem[];
+  }> {
+    const allItems = await this.getItems();
+    
+    // 1. Find the room
+    const room = allItems.find(i => 
+      (i.name.toLowerCase() === roomName.toLowerCase() || i.label?.toLowerCase() === roomName.toLowerCase()) &&
+      i.tags?.some(t => t.toLowerCase().includes('location'))
+    );
+
+    if (!room) {
+      throw new Error(`Room '${roomName}' not found in semantic model.`);
+    }
+
+    // 2. Find all direct children
+    const directChildren = allItems.filter(i => i.groupNames?.includes(room.name));
+
+    // 3. Separate Equipment from Points/Standalone
+    const equipment = directChildren
+      .filter(i => i.tags?.some(t => t.toLowerCase().includes('equipment')))
+      .map(e => ({
+        info: e,
+        points: allItems.filter(p => p.groupNames?.includes(e.name))
+      }));
+
+    const standaloneItems = directChildren.filter(i => 
+      !i.tags?.some(t => t.toLowerCase().includes('equipment'))
+    );
+
+    return {
+      room,
+      equipment,
+      standaloneItems
+    };
   }
 
   /**
    * Minimal schema mapping for discovery.
    */
-  async getSchema(): Promise<Array<{ name: string; type: string; label?: string }>> {
+  async getSchema(): Promise<Array<{ name: string; type: string; label?: string; tags: string[]; groups: string[] }>> {
     const items = await this.getItems();
     return items.map((i) => ({
       name: i.name,
       type: i.type,
       label: i.label,
+      tags: i.tags,
+      groups: i.groupNames,
     }));
   }
 
@@ -1048,14 +1137,29 @@ export class OpenHabClient {
 
     context += `### Usage Tips\n`;
     context += `- Use \`execute_batch\` when the user asks for multiple actions (e.g. 'Goodnight').\n`;
+    context += `- Use \`master_search\` for a combined search across items, things, and rules in one step.\n`;
+    context += `- Use \`get_room_inventory\` to see everything in a room (e.g. 'Kitchen') with equipment groupings.\n`;
     context += `- Use \`get_semantic_path\` and \`find_neighboring_equipment\` to understand the spatial layout of the home.\n`;
     context += `- Use \`schedule_command\` for delayed actions (e.g. 'turn off in 20 minutes').\n`;
     context += `- Use \`trigger_discovery_scan\` if you suspect hardware is missing or unlinked.\n`;
     context += `- Use \`get_stale_items\` for proactive maintenance of sensors.\n`;
-    context += `- Use \`search_items\` if you are unsure of the exact hardware name.\n`;
     context += `- Refer to the \`openhab://schema\` resource for a full lightweight list of available controls.\n`;
-
     return context;
+  }
+
+  /**
+   * Consolidated first-interaction bootstrap.
+   * Returns prompt context, room list, and full structural schema in one call.
+   */
+  async initialDiscovery(): Promise<{
+    context: string;
+    schema: Array<{ name: string; type: string; label?: string; tags: string[]; groups: string[] }>;
+  }> {
+    const [context, schema] = await Promise.all([
+      this.getPromptContext(),
+      this.getSchema()
+    ]);
+    return { context, schema };
   }
 
   /**
@@ -1492,8 +1596,26 @@ config:
       if (!this.enableSSE) return ['SSE Event stream is disabled. Enable it to buffer logs.'];
       return ['No events buffered yet. Waiting for system activity...'];
     }
-    const safeLines = Math.min(lines, this.MAX_LOG_BUFFER);
+    const safeLines = Math.min(lines, 100); // Standard recent logs remain small
     return this.eventLogBuffer.slice(-safeLines);
+  }
+
+  /**
+   * Mastery Tool: Fetches a larger window of historical logs from the buffer.
+   */
+  async getHistoricalLogs(lines: number = 500, search?: string): Promise<string[]> {
+    if (this.eventLogBuffer.length === 0) {
+      return ['No events buffered. Historical logs require the MCP server to be running and connected to SSE.'];
+    }
+
+    let logs = this.eventLogBuffer;
+    if (search) {
+      const query = search.toLowerCase();
+      logs = logs.filter(l => l.toLowerCase().includes(query));
+    }
+
+    const safeLines = Math.min(lines, this.MAX_LOG_BUFFER);
+    return logs.slice(-safeLines);
   }
 
   /**
