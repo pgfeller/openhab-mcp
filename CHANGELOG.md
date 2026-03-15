@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-03-16
+
+### Added
+
+- **SSE Log Buffering**: In-memory event buffer with searchable historical retrieval (`get_recent_logs`, `get_historical_logs`).
+- **Internal Health Metrics**: New `get_mcp_health` and `get_mcp_capabilities` for agent self-diagnostic.
+- **Enhanced Reliability**: Axios connection pooling (Keep-Alive) and global 10s timeout.
+- **Lazy Discovery**: Background pre-warming of items/things cache for zero-latency initial responses.
+
 ## [1.2.0] - 2026-03-12
 
 ### Added
