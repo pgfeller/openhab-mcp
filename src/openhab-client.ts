@@ -1,3 +1,8 @@
+/**
+ * OpenHabClient
+ * High-performance, cached client for OpenHAB v5+ with SSE event buffering,
+ * smart semantic discovery, and automated system auditing capabilities.
+ */
 import axios, { AxiosInstance } from 'axios';
 import http from 'http';
 import https from 'https';
