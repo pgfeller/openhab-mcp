@@ -210,3 +210,7 @@ Tools designed to automate complex workflows and provide AI-friendly context.
 ## License
 
 MIT
+
+## Release 1.3.1
+
+This release (1.3.1) contains documentation updates, minor fixes, and excludes test code from published releases. See [CHANGELOG.md](CHANGELOG.md) for full details.

@@ -4,3 +4,7 @@ dist/
 .env
 *.log
 package-lock.json
+
+# Ignore test files from being pushed in releases
+/src/__tests__/
+*.test.ts
