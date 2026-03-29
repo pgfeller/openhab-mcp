@@ -6,6 +6,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { OpenHabClient } from './openhab-client.js';
 import { registerTools } from './tools.js';
+import { startHttpServer } from './http-server.js';
+import { startTcpServer } from './tcp-server.js';
 
 async function main() {
   const openhabUrl = process.env.OPENHAB_URL;
@@ -267,6 +269,21 @@ async function main() {
   // Use stdio for communication with MCP Clients
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  // Start an HTTP adapter that exposes key resources by default.
+  // If `MCP_HTTP` is explicitly set to 'false' or '0', the HTTP adapter is disabled.
+  const mcpHttp = process.env.MCP_HTTP;
+  const enableHttp = mcpHttp === undefined || mcpHttp === 'true' || mcpHttp === '1';
+  if (enableHttp) {
+    const port = process.env.HTTP_PORT_MCP ? parseInt(process.env.HTTP_PORT_MCP, 10) : 8000;
+    await startHttpServer(client, port);
+  }
+
+  // Optionally start a TCP MCP transport for network MCP clients
+  if (process.env.MCP_TCP === 'true' || process.env.MCP_TCP === '1') {
+    const tcpPort = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : 8001;
+    await startTcpServer(client, tcpPort);
+  }
 
   console.error(`OpenHAB MCP Server started successfully connected to ${openhabUrl}`);
 }
